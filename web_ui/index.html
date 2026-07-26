@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Parkur Arac - Web Kontrol</title>
+<script src="https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; background: #12161c; color: #e6e6e6; margin: 0; padding: 12px; }
+  h1 { font-size: 18px; margin: 0 0 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; }
+  .panel { background: #1b212b; border: 1px solid #2a323f; border-radius: 8px; padding: 10px; }
+  .status { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  .ok { background: #3ecf5e; } .bad { background: #d9534f; } .warn { background: #e0a72e; }
+  input[type=text] { background: #0e1216; color: #e6e6e6; border: 1px solid #333; padding: 4px 6px; border-radius: 4px; }
+  button { background: #2a5cd9; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+  button:hover { background: #3a6ce9; }
+  canvas { background: #0a0d11; border-radius: 6px; display: block; }
+  table { border-collapse: collapse; font-size: 13px; }
+  td, th { padding: 2px 8px; text-align: left; }
+  #btlog { font-size: 12px; max-height: 160px; overflow-y: auto; white-space: pre; }
+  #joyWrap { touch-action: none; user-select: none; }
+  .metric { font-size: 22px; font-weight: 600; }
+  .metric-label { font-size: 11px; color: #9aa4b2; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<h1>Parkur Arac &mdash; Web Kontrol Paneli (rosbridge)</h1>
+
+<div class="panel" style="margin-bottom:12px;">
+  <span class="status" id="connDot"></span><span id="connText">baglanmadi</span>
+  &nbsp;&nbsp;
+  ws://<input type="text" id="host" value="" placeholder="ragnar veya IP" style="width:140px;">:<input type="text" id="port" value="9090" style="width:50px;">
+  <button onclick="connect()">Baglan</button>
+  <button onclick="disconnect()">Kes</button>
+  <br><small id="hint" style="color:#9aa4b2;"></small>
+</div>
+
+<div class="row">
+
+  <div class="panel">
+    <div class="metric-label">Lidar /scan</div>
+    <canvas id="scanCanvas" width="320" height="320"></canvas>
+  </div>
+
+  <div class="panel">
+    <div class="metric-label">Kamera /image_raw (web_video_server) + /detected_targets</div>
+    <div style="position:relative; width:320px; height:240px;">
+      <img id="camImg" width="320" height="240" style="position:absolute;top:0;left:0;background:#000;" src="">
+      <canvas id="detCanvas" width="320" height="240" style="position:absolute;top:0;left:0;background:transparent;"></canvas>
+    </div>
+    <div id="detList" style="font-size:12px;margin-top:4px;"></div>
+  </div>
+
+  <div class="panel" style="min-width:180px;">
+    <div class="metric-label">Hiz (/odometry/filtered)</div>
+    <div class="metric" id="speed">-- m/s</div>
+    <div class="metric-label" style="margin-top:8px;">Pozisyon</div>
+    <div id="pos">x: --, y: --</div>
+    <div class="metric-label" style="margin-top:8px;">Batarya</div>
+    <div class="metric" id="battery">N/A</div>
+    <small style="color:#9aa4b2;">bu simde batarya sensoru/topic yok - mock</small>
+  </div>
+
+  <div class="panel">
+    <div class="metric-label">Nav2 behavior tree log</div>
+    <div id="btlog"></div>
+  </div>
+
+  <div class="panel">
+    <div class="metric-label">Joystick (/cmd_vel_joy)</div>
+    <div id="joyWrap" style="width:160px;height:160px;border:1px solid #333;border-radius:50%;position:relative;background:#0e1216;">
+      <div id="joyKnob" style="width:50px;height:50px;border-radius:50%;background:#2a5cd9;position:absolute;left:55px;top:55px;"></div>
+    </div>
+    <div style="font-size:12px;margin-top:4px;">lin: <span id="joyLin">0.00</span> m/s, ang: <span id="joyAng">0.00</span> rad/s</div>
+  </div>
+
+</div>
+
+<script>
+let ros = null;
+let scanTopic, targetsTopic, odomTopic, btTopic, joyPub;
+const MAX_LIN = 0.5, MAX_ANG = 0.5; // matches nav2_params velocity_smoother limits
+
+function setConn(state, text) {
+  const dot = document.getElementById('connDot');
+  dot.className = 'status ' + state;
+  document.getElementById('connText').textContent = text;
+}
+
+function connect() {
+  const host = document.getElementById('host').value.trim();
+  const port = document.getElementById('port').value.trim();
+  if (!host) { alert('host gir (ör. ragnar veya IP adresi)'); return; }
+  const url = `ws://${host}:${port}`;
+  document.getElementById('camImg').src = `http://${host}:8080/stream?topic=/image_raw&type=mjpeg`;
+  setConn('warn', `baglaniyor: ${url}`);
+
+  ros = new ROSLIB.Ros({ url });
+
+  ros.on('connection', () => setConn('ok', `baglandi: ${url}`));
+  ros.on('error', (e) => setConn('bad', 'baglanti hatasi: ' + e));
+  ros.on('close', () => setConn('bad', 'baglanti kapandi'));
+
+  scanTopic = new ROSLIB.Topic({ ros, name: '/scan', messageType: 'sensor_msgs/msg/LaserScan' });
+  scanTopic.subscribe(drawScan);
+
+  targetsTopic = new ROSLIB.Topic({ ros, name: '/detected_targets', messageType: 'vision_msgs/msg/Detection2DArray' });
+  targetsTopic.subscribe(drawTargets);
+
+  odomTopic = new ROSLIB.Topic({ ros, name: '/odometry/filtered', messageType: 'nav_msgs/msg/Odometry' });
+  odomTopic.subscribe(updateOdom);
+
+  btTopic = new ROSLIB.Topic({ ros, name: '/behavior_tree_log', messageType: 'nav2_msgs/msg/BehaviorTreeLog' });
+  btTopic.subscribe(updateBt);
+
+  joyPub = new ROSLIB.Topic({ ros, name: '/cmd_vel_joy', messageType: 'geometry_msgs/msg/Twist' });
+}
+
+function disconnect() {
+  if (ros) ros.close();
+  setConn('bad', 'baglanmadi');
+}
+
+// ---- Lidar scan -> top-down canvas ----
+function drawScan(msg) {
+  const c = document.getElementById('scanCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  const cx = c.width / 2, cy = c.height / 2;
+  const maxR = Math.min(cx, cy) - 10;
+  const scale = maxR / msg.range_max;
+  ctx.strokeStyle = '#243040'; ctx.beginPath(); ctx.arc(cx, cy, maxR, 0, 7); ctx.stroke();
+  ctx.fillStyle = '#4dd0e1';
+  for (let i = 0; i < msg.ranges.length; i++) {
+    const r = msg.ranges[i];
+    if (!isFinite(r) || r < msg.range_min || r > msg.range_max) continue;
+    const angle = msg.angle_min + i * msg.angle_increment;
+    const x = cx + r * Math.cos(angle) * scale;
+    const y = cy - r * Math.sin(angle) * scale;
+    ctx.fillRect(x - 1, y - 1, 2, 2);
+  }
+  ctx.fillStyle = '#e0a72e';
+  ctx.beginPath(); ctx.arc(cx, cy, 4, 0, 7); ctx.fill();
+}
+
+// ---- detected_targets -> bbox overlay + list ----
+function drawTargets(msg) {
+  const c = document.getElementById('detCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  const sx = c.width / 640, sy = c.height / 480; // mock publisher uses 640x480
+  let rows = '';
+  for (const det of msg.detections) {
+    const cx = det.bbox.center.position.x * sx, cy = det.bbox.center.position.y * sy;
+    const w = det.bbox.size_x * sx, h = det.bbox.size_y * sy;
+    ctx.strokeStyle = '#ff4d4d'; ctx.lineWidth = 2;
+    ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
+    const hyp = det.results[0] ? det.results[0].hypothesis : { class_id: '?', score: 0 };
+    ctx.fillStyle = '#ff4d4d'; ctx.font = '11px sans-serif';
+    ctx.fillText(`${hyp.class_id} ${hyp.score.toFixed(2)}`, cx - w / 2, cy - h / 2 - 4);
+    rows += `<div>${det.id}: ${hyp.class_id} skor=${hyp.score.toFixed(2)} @ (${det.bbox.center.position.x.toFixed(0)},${det.bbox.center.position.y.toFixed(0)})</div>`;
+  }
+  document.getElementById('detList').innerHTML = rows || '<span style="color:#666;">hedef yok</span>';
+}
+
+// ---- odometry -> speed/position ----
+function updateOdom(msg) {
+  const vx = msg.twist.twist.linear.x, vy = msg.twist.twist.linear.y;
+  const speed = Math.sqrt(vx * vx + vy * vy);
+  document.getElementById('speed').textContent = speed.toFixed(2) + ' m/s';
+  const p = msg.pose.pose.position;
+  document.getElementById('pos').textContent = `x: ${p.x.toFixed(2)}, y: ${p.y.toFixed(2)}`;
+}
+
+// ---- nav2 behavior tree log ----
+function updateBt(msg) {
+  const el = document.getElementById('btlog');
+  for (const ev of msg.event_log) {
+    el.textContent += `${ev.node_name}: ${ev.previous_status} -> ${ev.current_status}\n`;
+  }
+  el.scrollTop = el.scrollHeight;
+  const lines = el.textContent.split('\n');
+  if (lines.length > 300) el.textContent = lines.slice(-300).join('\n');
+}
+
+// ---- joystick ----
+(function () {
+  const wrap = document.getElementById('joyWrap');
+  const knob = document.getElementById('joyKnob');
+  const radius = 55; // wrap 160px, knob 50px -> center travel radius
+  let dragging = false;
+  let lin = 0, ang = 0;
+  let publishTimer = null;
+
+  function setKnob(dx, dy) {
+    knob.style.left = (55 + dx) + 'px';
+    knob.style.top = (55 + dy) + 'px';
+  }
+
+  function onMove(clientX, clientY) {
+    const rect = wrap.getBoundingClientRect();
+    let dx = clientX - (rect.left + rect.width / 2);
+    let dy = clientY - (rect.top + rect.height / 2);
+    const dist = Math.min(Math.hypot(dx, dy), radius);
+    const angle = Math.atan2(dy, dx);
+    dx = Math.cos(angle) * dist; dy = Math.sin(angle) * dist;
+    setKnob(dx, dy);
+    lin = (-dy / radius) * MAX_LIN;   // up = forward
+    ang = (-dx / radius) * MAX_ANG;   // left = positive yaw
+    document.getElementById('joyLin').textContent = lin.toFixed(2);
+    document.getElementById('joyAng').textContent = ang.toFixed(2);
+  }
+
+  function reset() {
+    setKnob(0, 0); lin = 0; ang = 0;
+    document.getElementById('joyLin').textContent = '0.00';
+    document.getElementById('joyAng').textContent = '0.00';
+    publishOnce(); // send one zero command
+  }
+
+  function publishOnce() {
+    if (!joyPub) return;
+    joyPub.publish(new ROSLIB.Message({
+      linear: { x: lin, y: 0, z: 0 },
+      angular: { x: 0, y: 0, z: ang }
+    }));
+  }
+
+  function startPublishing() {
+    if (publishTimer) return;
+    publishTimer = setInterval(publishOnce, 100); // 10 Hz, must beat twist_mux timeout (0.5s)
+  }
+  function stopPublishing() {
+    clearInterval(publishTimer); publishTimer = null;
+  }
+
+  wrap.addEventListener('pointerdown', (e) => { dragging = true; onMove(e.clientX, e.clientY); startPublishing(); wrap.setPointerCapture(e.pointerId); });
+  wrap.addEventListener('pointermove', (e) => { if (dragging) onMove(e.clientX, e.clientY); });
+  wrap.addEventListener('pointerup', () => { dragging = false; stopPublishing(); reset(); });
+  wrap.addEventListener('pointercancel', () => { dragging = false; stopPublishing(); reset(); });
+})();
+
+document.getElementById('hint').textContent =
+  'Not: rosbridge WebSocket 9090, web_video_server HTTP 8080 (ayni host). Kamera akisi icin ayrica web_video_server calisiyor olmali.';
+</script>
+</body>
+</html>

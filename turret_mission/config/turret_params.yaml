@@ -1,0 +1,14 @@
+turret_aim_node:
+  ros__parameters:
+    image_width: 640
+    image_height: 480
+    kp_pan: 0.03
+    kp_tilt: 0.03
+    pixel_tolerance: 15.0
+    lost_timeout: 1.0
+    fire_duration: 2.0
+    min_score: 0.3
+    max_cmd: 5.0
+    control_rate_hz: 20.0
+    search_amplitude: 2.0
+    search_period: 4.0
