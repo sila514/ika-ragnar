@@ -27,6 +27,7 @@ setup(
             'mission_node = turret_mission.mission_node:main',
             'mock_target_publisher = turret_mission.mock_target_publisher:main',
             'simple_twist_mux = turret_mission.simple_twist_mux:main',
+            'obstacle_avoidance_node = turret_mission.obstacle_avoidance_node:main',
         ],
     },
 )
