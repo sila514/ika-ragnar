@@ -39,6 +39,26 @@ Görsel hizalama (taret PID) ve görev akışı (waypoint navigasyonu) node'lar�
 Aracı tarayıcıdan izlemek/kontrol etmek için `roslibjs` tabanlı tek sayfalık
 statik web arayüzü (`index.html`).
 
+## Entegrasyon / Teslim Notları (RPi Fiziksel Test)
+
+**`turret_mission` (turret_aim_node + mission_node) henüz RPi'a (ragnar) deploy
+edilmedi** — RPi'da şu an sadece `ika_vision` çalışıyor. Görev 7/8'in fiziksel
+testine geçildiğinde:
+
+1. `turret_mission` paketi RPi'a kopyalanıp `colcon build --packages-select
+   turret_mission` ile derlenmeli.
+2. `target_class_id` filtresi (varsayılan `"sign_target"`) mutlaka
+   doğrulanmalı — koniye (class 0) ateş etmemesi bu filtreye bağlı.
+3. Pan/tilt yön işareti (sağ/sol tersliği) gerçek donanımda test edilmeli.
+4. TB6600 ENA polaritesi Hüseyin tarafında doğrulanmalı.
+5. **`odom→base_link` TF eksik** — ne bu repoda (`turret_mission`/`ika_vision`)
+   ne de `ros_io.rs`'de bir EKF/`robot_localization` node'u veya TF
+   broadcaster yok. Sadece simülasyonda (Gazebo diff_drive plugin) otomatik
+   geliyor. Biri eklenmeden Nav2 gerçek robotta hatasız ama sessizce hiç
+   navigasyon yapmaz. Ayrıca `/turret_cmd` (Vector3) derece/mutlak açı değil,
+   `kp_pan/kp_tilt × piksel_hatası` (varsayılan ±5.0 clamp) — ros_io.rs
+   tarafında hız komutu gibi yorumlanmalı, bunu Hüseyin'e teyit ettirin.
+
 ## Simülasyonda test
 
 Gazebo simülasyonu ve `run_sim.sh` ayrı bir repoda:

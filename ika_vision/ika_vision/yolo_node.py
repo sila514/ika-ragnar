@@ -37,7 +37,7 @@ from hailo_platform import (
 # ---------------------------------------------------------------------------
 # AYARLAR - Gorev 5 bitince (kendi modelin gelince) burasi guncellenir
 # ---------------------------------------------------------------------------
-HEF_PATH = "/home/ika/hailo_models/yolov8s_h8l.hef"
+HEF_PATH = "/home/ika/hailo_models/yolov8s_parkur.hef"
 CONF_THRESHOLD = 0.5
 
 # Gorev 5 dataset'i (dataset_egitim/data.yaml) sirasiyla - index 0..14.
