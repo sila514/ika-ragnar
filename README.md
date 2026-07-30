@@ -70,12 +70,21 @@ testine geçildiğinde:
 7. RPi'da Rust toolchain (`cargo`) kurulu değil — `src/uvm` (muhtemelen
    `ros_io.rs`) colcon tarafından paket olarak tanınmıyor bile
    ("ament_cargo... FileNotFoundError: cargo"). Hüseyin'e iletilmeli.
-8. **Koni kaçınma:** `obstacle_avoidance_node` (harita/Nav2 gerektirmeyen,
-   `/scan` tabanlı basit reaktif kaçınma) eklendi ve RPi'a deploy edildi
-   ama simülasyonda ancak kısmen test edildi — gerçek konilerle fiziksel
-   testte doğrulanmalı. Çalıştırma: `simple_twist_mux` +
-   `obstacle_avoidance_node` ikisi birlikte gerekli (mux olmadan
-   `cmd_vel_nav` hiçbir yere gitmez).
+8. **Koni kaçınma — İKİ ayrı node var, AYNI ANDA ÇALIŞTIRMAYIN (ikisi de
+   `cmd_vel_nav`'a yazar, çakışır):**
+   - `obstacle_avoidance_node` — lidar (`/scan`) tabanlı, gerçek mesafe
+     ölçer, daha güvenilir. Simülasyonda kısmen test edildi.
+   - `vision_avoidance_node` — kamera/YOLO (`/detected_targets`) tabanlı,
+     "koni" tespitinin bbox genişliği/konumuna göre kaçınır, iki koni
+     arasında boşluk varsa oraya yönelmeye çalışır. Mock-publisher testiyle
+     7 senaryo doğrulandı (mantık doğru), ama **gerçek kamerayla hiç
+     test edilmedi** — bbox-genişliği eşikleri (`panic_width_px=220`,
+     `danger_width_px=60`, varsayılan) gerçek kamera/mesafe ile
+     kalibre edilmemiş, yarın ilk denemede çok erken/geç tepki verebilir,
+     ayarlamak gerekebilir.
+   İkisi de RPi'a deploy edildi. Çalıştırma (hangisini seçerseniz):
+   `simple_twist_mux` + (`obstacle_avoidance_node` VEYA
+   `vision_avoidance_node`) — mux olmadan `cmd_vel_nav` hiçbir yere gitmez.
 
 ## Simülasyonda test
 
