@@ -58,6 +58,18 @@ testine geçildiğinde:
    navigasyon yapmaz. Ayrıca `/turret_cmd` (Vector3) derece/mutlak açı değil,
    `kp_pan/kp_tilt × piksel_hatası` (varsayılan ±5.0 clamp) — ros_io.rs
    tarafında hız komutu gibi yorumlanmalı, bunu Hüseyin'e teyit ettirin.
+   **Doğrulanmış bug:** Hüseyin'in `ros_io.rs`'i bu değeri `rem_euclid(360)`
+   ile derece gibi sarıyor, örn. `-3` → `357` oluyor — taretin anlık tam tur
+   atmasına yol açar. Wrap-around KALDIRILMALI, değer direkt küçük
+   hız/delta komutu olarak kullanılmalı.
+6. **`maps/parkur_map.pgm` ve Nav2 bringup dosyaları (AMCL/costmap
+   parametreleri) hiçbir repoda yok** — `mission_node` bunlara (satır
+   27/56 yorumlarında belirtildiği gibi) güveniyor ama harita dosyası da
+   Nav2'nin kendi launch/parametre seti de commit edilmemiş. `mission_node`
+   gerçek/simüle robotta bunlar olmadan çalıştırılamaz.
+7. RPi'da Rust toolchain (`cargo`) kurulu değil — `src/uvm` (muhtemelen
+   `ros_io.rs`) colcon tarafından paket olarak tanınmıyor bile
+   ("ament_cargo... FileNotFoundError: cargo"). Hüseyin'e iletilmeli.
 
 ## Simülasyonda test
 
