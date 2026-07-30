@@ -40,10 +40,27 @@ from hailo_platform import (
 HEF_PATH = "/home/ika/hailo_models/yolov8s_h8l.hef"
 CONF_THRESHOLD = 0.5
 
-# Simdilik hazir COCO modeli kullaniliyor (rehberin Gorev 4 talimati:
-# "Once hazir COCO modeliyle pipeline'i kanitla"). Kendi modelin (parkur.yaml)
-# gelince bu listeyi degistir, ornek: ["koni", "panel", "tabela"]
-CLASS_NAMES = None  # None ise class_id sayisal olarak yayinlanir
+# Gorev 5 dataset'i (dataset_egitim/data.yaml) sirasiyla - index 0..14.
+# NOT: HEF_PATH hala eski COCO modelini gosteriyorsa bu liste ile eslesmez
+# (COCO cikisi 80 sinif, sirasi farkli) - HEF_PATH yeni modele cevrilene kadar
+# CLASS_NAMES'i devre disi birakmak icin gecici olarak None yapabilirsin.
+CLASS_NAMES = [
+    "koni",              # 0
+    "sign_1",            # 1
+    "sign_2",            # 2
+    "sign_3",            # 3
+    "sign_4",            # 4
+    "sign_5",            # 5
+    "sign_6",            # 6
+    "sign_7",            # 7
+    "sign_8",            # 8
+    "sign_9",            # 9
+    "sign_10",           # 10
+    "sign_11",           # 11
+    "sign_11_crossed",   # 12
+    "sign_stop",         # 13
+    "sign_target",       # 14 - hedef panel
+]
 
 
 class YoloNode(Node):

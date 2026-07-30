@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Gorev 7: Gorsel hizalama / taret PID.
 
-/detected_targets (vision_msgs/Detection2DArray) -> en yuksek skorlu hedefi al
+/detected_targets (vision_msgs/Detection2DArray) -> sadece target_class_id
+sinifindaki (varsayilan: sign_target) en yuksek skorlu hedefi al
 piksel hatasi -> P kontrolcu -> /turret_cmd (geometry_msgs/Vector3, x=pan, y=tilt)
 Hedef kayipsa: <=1s sabit tut (HOLDING), >1s arama moduna don (SEARCHING).
 Hizalanmis (|hata|<tolerans) ve /estop==false ise /fire_cmd=true, 2s sonra false + reset.
@@ -36,6 +37,7 @@ class TurretAimNode(Node):
         self.declare_parameter('lost_timeout', 1.0)
         self.declare_parameter('fire_duration', 2.0)
         self.declare_parameter('min_score', 0.3)
+        self.declare_parameter('target_class_id', 'sign_target')
         self.declare_parameter('max_cmd', 5.0)
         self.declare_parameter('control_rate_hz', 20.0)
         self.declare_parameter('search_amplitude', 2.0)
@@ -49,6 +51,7 @@ class TurretAimNode(Node):
         self.lost_timeout = self.get_parameter('lost_timeout').value
         self.fire_duration = self.get_parameter('fire_duration').value
         self.min_score = self.get_parameter('min_score').value
+        self.target_class_id = self.get_parameter('target_class_id').value
         self.max_cmd = self.get_parameter('max_cmd').value
         self.search_amplitude = self.get_parameter('search_amplitude').value
         self.search_period = self.get_parameter('search_period').value
@@ -87,9 +90,12 @@ class TurretAimNode(Node):
         best = None
         best_score = -1.0
         for det in msg.detections:
-            if not det.results:
+            target_results = [
+                r for r in det.results if r.hypothesis.class_id == self.target_class_id
+            ]
+            if not target_results:
                 continue
-            score = max(r.hypothesis.score for r in det.results)
+            score = max(r.hypothesis.score for r in target_results)
             if score >= self.min_score and score > best_score:
                 best_score = score
                 best = det

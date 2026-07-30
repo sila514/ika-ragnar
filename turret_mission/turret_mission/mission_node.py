@@ -42,6 +42,7 @@ class MissionNavigator(BasicNavigator):
         super().__init__(node_name='mission_navigator')
 
         self.declare_parameter('min_score', 0.3)
+        self.declare_parameter('target_class_id', 'sign_target')
         self.declare_parameter('engage_lost_timeout', 2.0)
         # Robotun Gazebo'daki baslangic (spawn) pozu - AMCL'e ilk poz olarak
         # verilir. parkur_arac.sdf'teki spawn pose'u ile eslesmelidir.
@@ -72,6 +73,7 @@ class MissionNavigator(BasicNavigator):
         self.declare_parameter('waypoints', default_wp)
 
         self.min_score = self.get_parameter('min_score').value
+        self.target_class_id = self.get_parameter('target_class_id').value
         self.engage_lost_timeout = self.get_parameter('engage_lost_timeout').value
         # /detected_targets kesilirse (hedef kayip) bu sure icinde hala
         # "gorunur" sayilir - dedektorun kendi yayin periyoduna gore ayarlanir.
@@ -97,9 +99,12 @@ class MissionNavigator(BasicNavigator):
     def _targets_cb(self, msg: Detection2DArray):
         best_score = -1.0
         for det in msg.detections:
-            if not det.results:
+            target_results = [
+                r for r in det.results if r.hypothesis.class_id == self.target_class_id
+            ]
+            if not target_results:
                 continue
-            score = max(r.hypothesis.score for r in det.results)
+            score = max(r.hypothesis.score for r in target_results)
             best_score = max(best_score, score)
 
         if best_score >= self.min_score:
