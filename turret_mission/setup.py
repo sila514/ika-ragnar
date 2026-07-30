@@ -29,6 +29,7 @@ setup(
             'simple_twist_mux = turret_mission.simple_twist_mux:main',
             'obstacle_avoidance_node = turret_mission.obstacle_avoidance_node:main',
             'vision_avoidance_node = turret_mission.vision_avoidance_node:main',
+            'fused_avoidance_node = turret_mission.fused_avoidance_node:main',
         ],
     },
 )
