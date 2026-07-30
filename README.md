@@ -70,6 +70,12 @@ testine geçildiğinde:
 7. RPi'da Rust toolchain (`cargo`) kurulu değil — `src/uvm` (muhtemelen
    `ros_io.rs`) colcon tarafından paket olarak tanınmıyor bile
    ("ament_cargo... FileNotFoundError: cargo"). Hüseyin'e iletilmeli.
+8. **Koni kaçınma:** `obstacle_avoidance_node` (harita/Nav2 gerektirmeyen,
+   `/scan` tabanlı basit reaktif kaçınma) eklendi ve RPi'a deploy edildi
+   ama simülasyonda ancak kısmen test edildi — gerçek konilerle fiziksel
+   testte doğrulanmalı. Çalıştırma: `simple_twist_mux` +
+   `obstacle_avoidance_node` ikisi birlikte gerekli (mux olmadan
+   `cmd_vel_nav` hiçbir yere gitmez).
 
 ## Simülasyonda test
 
