@@ -70,21 +70,25 @@ testine geçildiğinde:
 7. RPi'da Rust toolchain (`cargo`) kurulu değil — `src/uvm` (muhtemelen
    `ros_io.rs`) colcon tarafından paket olarak tanınmıyor bile
    ("ament_cargo... FileNotFoundError: cargo"). Hüseyin'e iletilmeli.
-8. **Koni kaçınma — İKİ ayrı node var, AYNI ANDA ÇALIŞTIRMAYIN (ikisi de
-   `cmd_vel_nav`'a yazar, çakışır):**
-   - `obstacle_avoidance_node` — lidar (`/scan`) tabanlı, gerçek mesafe
-     ölçer, daha güvenilir. Simülasyonda kısmen test edildi.
-   - `vision_avoidance_node` — kamera/YOLO (`/detected_targets`) tabanlı,
-     "koni" tespitinin bbox genişliği/konumuna göre kaçınır, iki koni
-     arasında boşluk varsa oraya yönelmeye çalışır. Mock-publisher testiyle
-     7 senaryo doğrulandı (mantık doğru), ama **gerçek kamerayla hiç
-     test edilmedi** — bbox-genişliği eşikleri (`panic_width_px=220`,
-     `danger_width_px=60`, varsayılan) gerçek kamera/mesafe ile
-     kalibre edilmemiş, yarın ilk denemede çok erken/geç tepki verebilir,
-     ayarlamak gerekebilir.
-   İkisi de RPi'a deploy edildi. Çalıştırma (hangisini seçerseniz):
-   `simple_twist_mux` + (`obstacle_avoidance_node` VEYA
-   `vision_avoidance_node`) — mux olmadan `cmd_vel_nav` hiçbir yere gitmez.
+8. **Koni kaçınma — ÖNERİLEN: `fused_avoidance_node` (lidar+kamera
+   birleşik).** Bu, `obstacle_avoidance_node` (sadece lidar) ve
+   `vision_avoidance_node`'un (sadece kamera) YERİNE geçer — o ikisi
+   hâlâ repoda duruyor (referans/yedek için) ama **aynı anda
+   `fused_avoidance_node` ile çalıştırılmamalı**, hepsi `cmd_vel_nav`'a
+   yazıyor, çakışır. Sadece birini seçin, önerilen `fused_avoidance_node`:
+   - Lidar (`/scan`) = güvenlik son savunma hattı: önde gerçekten çok
+     yakın bir şey varsa (koni olsun olmasın) kamera ne görürse görsün
+     durur/döner.
+   - Kamera (`/detected_targets`, "koni") = yönlendirme: iki koni sol/sağ
+     dengeliyse aralarındaki boşluğa yönelir, tek koniden uzaklaşır.
+   - Kamera koni görmüyor ama lidar orta mesafede engel görüyorsa
+     (duvar vb.): sadece lidar'a göre yavaşlayıp döner.
+   6 senaryolu mock testle doğrulandı (güvenlik-kazanır testi dahil).
+   **Ama gerçek donanımda/kamerayla hiç test edilmedi** — bbox eşikleri
+   (`panic_width_px=220`, `danger_width_px=60`) kalibre edilmemiş, yarın
+   ilk denemede ayarlamak gerekebilir. RPi'a deploy edildi.
+   Çalıştırma: `simple_twist_mux` + `fused_avoidance_node` (mux olmadan
+   `cmd_vel_nav` hiçbir yere gitmez).
 
 ## Simülasyonda test
 
